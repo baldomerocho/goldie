@@ -240,7 +240,7 @@ function Loaded({ manifest, saved }: { manifest: StoreManifest; saved: SavedDesi
 
   const platformDevices = manifest.devices.filter((d) => d.platform === platform);
   const spec = platformDevices.find((d) => d.key === device) ?? platformDevices[0];
-  const captures = spec ? design.captures[spec.key] : undefined;
+  const captures = spec ? design.captures[spec.key]?.[locale] : undefined;
   const firstVariant = design.frameVariants.find((v) => v.device === device)?.key;
   const frameUrl = frame
     ? `frames/${frame}.png`

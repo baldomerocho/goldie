@@ -3,15 +3,14 @@ import {
   lstat,
   mkdir,
   readdir,
-  readFile,
   rm,
   stat,
   symlink,
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
-import type { CaptureManifest } from "./capture.ts";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
+import { readCaptureManifest } from "./capture.ts";
 import {
   type Decoration,
   deviceFrame,
@@ -111,13 +110,19 @@ export type StoreManifest = {
       sceneId: string;
       segments: Array<{ id: string }>;
     } | null;
-    /** Raw capture urls per device key; a device is absent until `goldie capture` ran. */
+    /**
+     * Raw capture urls per device key, then locale; a locale is absent until
+     * `goldie capture` ran for it.
+     */
     captures: Record<
       string,
-      {
-        screenshots: Array<{ sceneId: string; url: string }>;
-        clips: Array<{ segmentId: string; url: string; durationSeconds: number }> | null;
-      }
+      Record<
+        string,
+        {
+          screenshots: Array<{ sceneId: string; url: string }>;
+          clips: Array<{ segmentId: string; url: string; durationSeconds: number }> | null;
+        }
+      >
     >;
   };
 };
@@ -219,23 +224,26 @@ export async function writeManifest(cfg: LoadedConfig): Promise<string> {
     }
   }
 
+  // A capture file's url is its path under out/, which is also the web root,
+  // so a manifest from before per-locale captures resolves just the same.
+  const rawUrl = (file: string) => relative(cfg.outDir, file).split(sep).join("/");
   const captures: StoreManifest["design"]["captures"] = {};
   for (const deviceKey of cfg.devices) {
-    const raw = await readCaptureManifest(cfg, deviceKey);
-    if (!raw) continue;
-    captures[deviceKey] = {
-      screenshots: raw.screenshots.map((s) => ({
-        sceneId: s.sceneId,
-        url: `raw/${deviceKey}/${basename(s.file)}`,
-      })),
-      clips: raw.preview
-        ? raw.preview.clips.map((c) => ({
-            segmentId: c.segmentId,
-            url: `raw/${deviceKey}/${basename(c.file)}`,
-            durationSeconds: c.durationSeconds,
-          }))
-        : null,
-    };
+    for (const locale of cfg.locales) {
+      const raw = await readCaptureManifest(cfg, deviceKey, locale);
+      if (!raw) continue;
+      captures[deviceKey] ??= {};
+      captures[deviceKey][locale] = {
+        screenshots: raw.screenshots.map((s) => ({ sceneId: s.sceneId, url: rawUrl(s.file) })),
+        clips: raw.preview
+          ? raw.preview.clips.map((c) => ({
+              segmentId: c.segmentId,
+              url: rawUrl(c.file),
+              durationSeconds: c.durationSeconds,
+            }))
+          : null,
+      };
+    }
   }
 
   const previewScene = cfg.scenes.find(isPreview);
@@ -284,17 +292,6 @@ export async function writeManifest(cfg: LoadedConfig): Promise<string> {
   const file = join(webDir, "store.json");
   await writeFile(file, JSON.stringify(manifest, null, 2));
   return file;
-}
-
-async function readCaptureManifest(
-  cfg: LoadedConfig,
-  deviceKey: DeviceKey,
-): Promise<CaptureManifest | null> {
-  try {
-    return JSON.parse(await readFile(join(cfg.outDir, "raw", deviceKey, "manifest.json"), "utf8"));
-  } catch {
-    return null;
-  }
 }
 
 async function collect(

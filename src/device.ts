@@ -391,6 +391,34 @@ export async function clearStatusBar(key: DeviceKey, udid: string): Promise<void
   await exec("xcrun", ["simctl", "status_bar", udid, "clear"], { quiet: true });
 }
 
+/**
+ * Runs the app in `locale` on android. Android 13 added per-app locales
+ * (`cmd locale set-app-locales`): no root, no reboot, and the setting survives
+ * the app restarts a flow does. A reinstall clears it, so capture() calls this
+ * after installing. Older system images lack the command; the capture then
+ * runs in the emulator's own language, and says so. iOS pins the locale in
+ * prepare() by rebooting the simulator, so this is a no-op there.
+ */
+export async function setAppLocale(
+  key: DeviceKey,
+  udid: string,
+  appId: string,
+  locale: string,
+): Promise<void> {
+  if (!isAndroid(key)) return;
+  const r = await exec(
+    "adb",
+    ["-s", udid, "shell", "cmd", "locale", "set-app-locales", appId, "--locales", locale],
+    { quiet: true },
+  );
+  if (r.code !== 0) {
+    console.log(
+      `  cannot set the app locale to ${locale} (needs an Android 13+ image); ` +
+        "capturing in the emulator's own language",
+    );
+  }
+}
+
 export async function setAppearance(
   key: DeviceKey,
   udid: string,

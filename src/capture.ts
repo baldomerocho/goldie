@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import * as argent from "./argent.ts";
 import {
@@ -25,9 +25,11 @@ async function runFlow(path: string, udid: string) {
   return argent.flow(path, udid);
 }
 
-/** What `frame`/`preview` read. Written to out/raw/<device>/manifest.json. */
+/** What `frame`/`preview` read. Written to out/raw/<device>/<locale>/manifest.json. */
 export type CaptureManifest = {
   device: DeviceKey;
+  /** The locale the app ran in; absent in manifests from releases before per-locale captures. */
+  locale?: string;
   udid: string;
   capturedAt: string;
   screenshots: Array<{ sceneId: string; file: string }>;
@@ -37,24 +39,62 @@ export type CaptureManifest = {
   } | null;
 };
 
-export async function capture(cfg: LoadedConfig, deviceKey: DeviceKey): Promise<CaptureManifest> {
+/** Directory of one device's raw captures for one locale. */
+export function rawDir(cfg: LoadedConfig, deviceKey: DeviceKey, locale: string): string {
+  return join(cfg.outDir, "raw", deviceKey, locale);
+}
+
+/**
+ * The capture manifest a device's raw captures for a locale, or null when
+ * that capture has not run. Releases before per-locale captures wrote one
+ * manifest per device under out/raw/<device>/; it is read as a fallback so an
+ * existing out/ keeps rendering until the next `goldie capture`.
+ */
+export async function readCaptureManifest(
+  cfg: LoadedConfig,
+  deviceKey: DeviceKey,
+  locale: string,
+): Promise<CaptureManifest | null> {
+  for (const dir of [rawDir(cfg, deviceKey, locale), join(cfg.outDir, "raw", deviceKey)]) {
+    try {
+      return JSON.parse(await readFile(join(dir, "manifest.json"), "utf8"));
+    } catch {
+      /* try the next location */
+    }
+  }
+  return null;
+}
+
+/**
+ * Replays every scene flow with the app running in `locale` and saves the
+ * raw captures under out/raw/<device>/<locale>/. The simulator is rebooted
+ * into the locale; the emulator gets a per-app locale after the install.
+ */
+export async function capture(
+  cfg: LoadedConfig,
+  deviceKey: DeviceKey,
+  locale: string = cfg.locales[0]!,
+): Promise<CaptureManifest> {
   const spec = DEVICES[deviceKey];
   const udid = await device.resolveUdid(deviceKey);
-  const rawDir = join(cfg.outDir, "raw", deviceKey);
-  await mkdir(rawDir, { recursive: true });
+  const dir = rawDir(cfg, deviceKey, locale);
+  await mkdir(dir, { recursive: true });
 
   const app = appFor(cfg, deviceKey);
-  console.log(`> ${spec.simulatorName ?? spec.label} (${udid})`);
-  await device.prepare(deviceKey, udid, cfg.locales[0]!, cfg.appearance);
+  console.log(`> ${spec.simulatorName ?? spec.label} (${udid}) ${locale}`);
+  await device.prepare(deviceKey, udid, locale, cfg.appearance);
   // A reinstall wipes app data, which is what makes a re-capture deterministic:
   // flows that create records start from the same empty state every run.
   await device.installApp(udid, app.path, app.id);
+  // The reinstall also drops any per-app locale, so it is set afterwards.
+  await device.setAppLocale(deviceKey, udid, app.id, locale);
   // First launch after a reinstall pays for a cold JS bundle, which can outlast
   // the launch step's devtools handshake budget. Burn that cost here instead.
   await device.warmUp(udid, app.id);
 
   const manifest: CaptureManifest = {
     device: deviceKey,
+    locale,
     udid,
     capturedAt: new Date().toISOString(),
     screenshots: [],
@@ -79,7 +119,7 @@ export async function capture(cfg: LoadedConfig, deviceKey: DeviceKey): Promise<
     await sleep(800);
     await device.pinStatusBar(deviceKey, udid);
     await sleep(400);
-    const file = join(rawDir, `${scene.id}.png`);
+    const file = join(dir, `${scene.id}.png`);
     await argent.runToFile("screenshot", { udid, scale: 1.0, includeImageInContext: false }, file);
     if (spec.native) {
       await assertSize(file, spec.native.width, spec.native.height);
@@ -95,13 +135,13 @@ export async function capture(cfg: LoadedConfig, deviceKey: DeviceKey): Promise<
   const previewScene = cfg.scenes.find(isPreview);
   if (previewScene) {
     if (spec.preview) {
-      manifest.preview = await captureSegments(cfg, previewScene, deviceKey, udid, rawDir, app.id);
+      manifest.preview = await captureSegments(cfg, previewScene, deviceKey, udid, dir, app.id);
     } else {
       console.log(`  ${deviceKey} has no preview pipeline; skipping segments`);
     }
   }
 
-  await writeFile(join(rawDir, "manifest.json"), JSON.stringify(manifest, null, 2));
+  await writeFile(join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
   return manifest;
 }
 

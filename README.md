@@ -61,6 +61,12 @@ goldie all        Capture, frame, render the preview and verify
 goldie studio     Preview and tweak the assets in the browser
 ```
 
+`capture` runs every flow once per device and locale, with the app itself in
+that language: the simulator is rebooted into the locale and the emulator
+gets a per-app locale (Android 13+ images). Raw captures land in
+`out/raw/<device>/<locale>/`. Flows that must replay in several languages
+should select by `id:` rather than by visible text.
+
 The output goes to `out/screenshots/<device>/<locale>/` and
 `out/previews/<device>/<locale>/`. The iPhone gets 1320 x 2868 screenshots
 and an 886 x 1920 H.264 preview. Google Play gets 1080 x 1920 screenshots.

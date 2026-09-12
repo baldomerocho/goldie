@@ -1,5 +1,5 @@
 export type { CaptureManifest } from "./capture.ts";
-export { capture } from "./capture.ts";
+export { capture, rawDir, readCaptureManifest } from "./capture.ts";
 export type {
   Decoration,
   GoldieConfig,

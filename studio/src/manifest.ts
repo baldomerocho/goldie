@@ -87,8 +87,8 @@ export type Design = {
     sceneId: string;
     segments: Array<{ id: string }>;
   } | null;
-  /** Raw capture urls per device key; a device is absent until `goldie capture` ran. */
-  captures: Record<string, DeviceCaptures>;
+  /** Raw capture urls per device key, then locale; absent until `goldie capture` ran for it. */
+  captures: Record<string, Record<string, DeviceCaptures>>;
 };
 
 export type StoreManifest = {
@@ -139,9 +139,11 @@ export async function loadManifest(): Promise<StoreManifest> {
   // timestamp becomes a cache-buster - a capture followed by a manifest
   // reload shows new pixels.
   const v = `?v=${Date.parse(manifest.generatedAt) || 0}`;
-  for (const captures of Object.values(manifest.design.captures)) {
-    for (const shot of captures.screenshots) shot.url += v;
-    for (const clip of captures.clips ?? []) clip.url += v;
+  for (const byLocale of Object.values(manifest.design.captures)) {
+    for (const captures of Object.values(byLocale)) {
+      for (const shot of captures.screenshots) shot.url += v;
+      for (const clip of captures.clips ?? []) clip.url += v;
+    }
   }
   return manifest;
 }
