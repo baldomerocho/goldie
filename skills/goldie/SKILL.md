@@ -253,7 +253,9 @@ flows replay on Android when their selectors match. Add the config's
 `android: { appPath: "<apk>", applicationId: "<id>" }` block, make sure an
 AVD with the Pixel 10 Pro or Pixel 9 Pro hardware profile exists (same
 screen; goldie reuses a running emulator or boots the AVD itself), then run
-the same capture/frame commands. Android tiles are framed with the bundled
+the same capture/frame commands. When the user wants a physical phone
+instead, pass `--serial <adb id>` (from `adb devices`) to `doctor`, `capture`
+and `all`; the phone's screen is cover-fitted into the Pixel bezel. Android tiles are framed with the bundled
 Pixel 10 Pro bezel instead of the config's `frame` variant (iPhone art);
 `android.frame` replaces it with your own art. Play takes no video uploads
 (the promo video is a YouTube link), so `preview` renders a 1080x2400

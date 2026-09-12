@@ -94,6 +94,12 @@ android: {
 },
 ```
 
+A physical phone stands in for the emulator with `--serial <adb id>` (or
+`GOLDIE_ANDROID_SERIAL`), for example `goldie capture --serial 192.168.0.5:5555`
+after `adb devices` lists it. The phone's own resolution is cover-fitted into
+the Pixel bezel, so a 20:9 screen loses a sliver at the edges. The emulator
+stays the default because its screen matches the bezel exactly.
+
 goldie frames Android tiles with the bundled Pixel 10 Pro bezel. The `frame`
 variant is iPhone art, so it does not apply to them. `android.frame` swaps
 in your own art and its geometry. The Play Store promo video is a YouTube

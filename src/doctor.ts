@@ -137,11 +137,14 @@ export async function doctor(cfg: LoadedConfig): Promise<boolean> {
       // Doctor only reports; capture is what boots an emulator when needed.
       const serial = await device.resolveUdid(key, { autoBoot: false }).catch(() => null);
       const avds = serial ? [] : await device.matchingAvds(key).catch(() => []);
+      const pinned = device.pinnedSerial();
+      const kind =
+        serial && pinned ? ((await device.isEmulator(serial)) ? "emulator" : "phone") : null;
       checks.push({
-        name: `emulator ${key}`,
+        name: `${pinned ? "device" : "emulator"} ${key}`,
         ok: Boolean(serial) || avds.length > 0,
         detail:
-          serial ??
+          (serial && kind ? `${serial} (${kind}, pinned by --serial)` : serial) ??
           (avds.length > 0
             ? `not running; capture will boot AVD "${avds[0]}"`
             : `no AVD with the ${spec.avdDeviceNames?.map((p) => `"${p}"`).join(" or ")} hardware profile`),

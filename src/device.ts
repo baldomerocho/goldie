@@ -186,7 +186,35 @@ const profileList = (wanted: string[]) => wanted.map((p) => `"${p}"`).join(" or 
  * lists phones plugged in over USB in the same "device" state, and picking one
  * would reinstall the app over its data and rewrite its system UI.
  */
+/**
+ * The adb serial the config or CLI pinned with GOLDIE_ANDROID_SERIAL (the
+ * `--serial` flag), or null. A pinned serial is used as-is, hardware profile
+ * unchecked: it is how a physical phone plugged in over USB or wifi adb
+ * stands in for the Pixel emulator. Its captures come back at the phone's own
+ * resolution, which the renderer cover-fits into the Pixel bezel.
+ */
+export function pinnedSerial(): string | null {
+  const serial = process.env.GOLDIE_ANDROID_SERIAL?.trim();
+  return serial ? serial : null;
+}
+
+/** Is this adb serial an emulator (answers `adb emu`) rather than a physical device? */
+export async function isEmulator(serial: string): Promise<boolean> {
+  const r = await exec("adb", ["-s", serial, "emu", "avd", "name"], { quiet: true });
+  return r.code === 0;
+}
+
 async function resolveSerial(key: DeviceKey, opts: { autoBoot?: boolean } = {}): Promise<string> {
+  const pinned = pinnedSerial();
+  if (pinned) {
+    if (!(await adbSerials()).includes(pinned)) {
+      throw new Error(
+        `No adb device "${pinned}" in "device" state (GOLDIE_ANDROID_SERIAL / --serial). ` +
+          "Check: adb devices",
+      );
+    }
+    return pinned;
+  }
   const wanted = DEVICES[key].avdDeviceNames!;
   const running = await runningSerialForProfile(wanted);
   if (running) return running;
@@ -256,6 +284,7 @@ export async function boot(udid: string): Promise<void> {
 
 export async function shutdown(key: DeviceKey, udid: string): Promise<void> {
   if (isAndroid(key)) {
+    // `adb emu kill` only answers on an emulator; a physical device stays on.
     await exec("adb", ["-s", udid, "emu", "kill"], { quiet: true });
     return;
   }

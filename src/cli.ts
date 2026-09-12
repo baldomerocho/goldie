@@ -46,6 +46,8 @@ Options
   --template <key>    Override theme.template for this run (${TEMPLATE_KEYS.join(" | ")}; "none" for one layout)
   --layout <key>      Override theme.layout for this run (${LAYOUT_KEYS.join(" | ")})
   --screen-only       Render bare screens with no bezel for this run
+  --serial <adb id>   Capture on this adb device (a phone over USB or wifi adb) instead of the Pixel
+                      emulator; same as GOLDIE_ANDROID_SERIAL. Default: an emulator with the Pixel profile
 `;
 
 async function main() {
@@ -65,6 +67,9 @@ async function main() {
     console.log(packageVersion());
     return 0;
   }
+
+  // The device layer reads the env var, so the flag just seeds it.
+  if (opt("serial")) process.env.GOLDIE_ANDROID_SERIAL = opt("serial");
 
   const cfg = await loadConfig(opt("config") ? resolve(process.cwd(), opt("config")!) : undefined);
 
