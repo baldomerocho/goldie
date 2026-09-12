@@ -26,9 +26,11 @@ const config: GoldieConfig = {
   // android: {
   //   appPath: "/path/to/app-release.apk",
   //   applicationId: "com.example.app",
+  //   grantPermissions: ["android.permission.POST_NOTIFICATIONS"], // no system dialogs mid-flow
   // },
 
-  devices: ["iphone-6.9", "pixel-10-pro"], // keys from src/specs.ts; "ipad-13" for the 13" iPad
+  devices: ["iphone-6.9", "pixel-10-pro"], // keys from src/specs.ts
+  // resetBetweenScenes: true,  // clear app data before every flow (apps with onboarding); "ipad-13" for the 13" iPad
   locales: ["en-US"],
   appearance: "light",
 

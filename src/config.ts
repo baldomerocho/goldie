@@ -175,6 +175,13 @@ export type GoldieConfig = {
     appPath: string;
     applicationId: string;
     /**
+     * Runtime permissions to grant with `pm grant` after every install and
+     * every reset, e.g. "android.permission.POST_NOTIFICATIONS". A permission
+     * the app asks for at launch otherwise pops the system dialog over the
+     * first screen, at a moment no flow can predict.
+     */
+    grantPermissions?: string[];
+    /**
      * Bezel art for the android device, replacing the bundled Pixel 10 Pro
      * art, with its own geometry: the image (relative to the config), its
      * pixel size, the transparent screen cutout inside it, and the cutout's
@@ -193,6 +200,14 @@ export type GoldieConfig = {
   };
   devices: DeviceKey[];
   locales: Locale[];
+  /**
+   * Clear the app's data before every scene flow, not only once per capture,
+   * so each flow starts from the state a fresh install has. Needed when the
+   * app shows onboarding (or any one-time screen) that every flow walks
+   * through: without it only the first flow sees that screen. Android runs
+   * `pm clear`; iOS reinstalls the .app.
+   */
+  resetBetweenScenes?: boolean;
   /** Simulator appearance for every capture. */
   appearance: "light" | "dark";
   /**

@@ -86,8 +86,10 @@ export async function capture(
   // A reinstall wipes app data, which is what makes a re-capture deterministic:
   // flows that create records start from the same empty state every run.
   await device.installApp(udid, app.path, app.id);
-  // The reinstall also drops any per-app locale, so it is set afterwards.
+  // The reinstall also drops any per-app locale and every granted
+  // permission, so both are applied afterwards.
   await device.setAppLocale(deviceKey, udid, app.id, locale);
+  await device.grantPermissions(deviceKey, udid, app.id, cfg.android?.grantPermissions);
   // First launch after a reinstall pays for a cold JS bundle, which can outlast
   // the launch step's devtools handshake budget. Burn that cost here instead.
   await device.warmUp(udid, app.id);
@@ -101,8 +103,19 @@ export async function capture(
     preview: null,
   };
 
+  // The install above already left the app fresh for the first flow.
+  let fresh = true;
+  const resetIfAsked = async () => {
+    if (!cfg.resetBetweenScenes || fresh) return;
+    await device.resetApp(deviceKey, udid, app.path, app.id);
+    await device.setAppLocale(deviceKey, udid, app.id, locale);
+    await device.grantPermissions(deviceKey, udid, app.id, cfg.android?.grantPermissions);
+  };
+
   for (const scene of cfg.scenes.filter(isScreenshot)) {
     console.log(`  screenshot ${scene.id}`);
+    await resetIfAsked();
+    fresh = false;
     const report = await runFlow(flowPath(cfg, scene.flow), udid);
     if (!report.ok) throw new FlowFailure(scene.id, flowPath(cfg, scene.flow), udid, report);
 
@@ -135,6 +148,7 @@ export async function capture(
   const previewScene = cfg.scenes.find(isPreview);
   if (previewScene) {
     if (spec.preview) {
+      await resetIfAsked();
       manifest.preview = await captureSegments(cfg, previewScene, deviceKey, udid, dir, app.id);
     } else {
       console.log(`  ${deviceKey} has no preview pipeline; skipping segments`);

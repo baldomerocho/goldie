@@ -62,6 +62,11 @@ steps:
 - **Never hardcode a simulator udid.** `argent flow run --device` injects it.
 - **`await visible` before acting on anything that appears.** Then
   `await idle` before the capture moment, so animations finish.
+- **Only the first flow starts from a fresh install** unless the config sets
+  `resetBetweenScenes: true`, which clears the app's data before every flow.
+  Set it when the app shows onboarding or any other one-time screen that
+  every flow walks through; otherwise the second flow finds the home screen
+  where the first one left off.
 - **The app starts with cleared data.** If a scene needs content on screen
   (a populated list, a created item), the flow must create it, or the app must
   seed demo data on first launch. Check how the app behaves on a fresh install

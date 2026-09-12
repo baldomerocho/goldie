@@ -512,6 +512,45 @@ export async function warmUp(udid: string, bundleId: string): Promise<void> {
   await argent.run("await-screen-idle", { udid, timeoutMs: 60000 }).catch(() => {});
 }
 
+/**
+ * Puts the app back in the state a fresh install has. Android clears its
+ * data in place (`pm clear`), which keeps the install and the per-app locale;
+ * iOS has no equivalent, so it reinstalls.
+ */
+export async function resetApp(
+  key: DeviceKey,
+  udid: string,
+  appPath: string,
+  bundleId: string,
+): Promise<void> {
+  if (isAndroid(key)) {
+    await adbShell(udid, ["pm", "clear", bundleId]);
+    return;
+  }
+  await installApp(udid, appPath, bundleId);
+}
+
+/** Grants runtime permissions up front so the system never asks mid-flow. Android only. */
+export async function grantPermissions(
+  key: DeviceKey,
+  udid: string,
+  appId: string,
+  permissions: string[] | undefined,
+): Promise<void> {
+  if (!isAndroid(key) || !permissions?.length) return;
+  for (const permission of permissions) {
+    const r = await exec("adb", ["-s", udid, "shell", "pm", "grant", appId, permission], {
+      quiet: true,
+    });
+    if (r.code !== 0) {
+      throw new Error(
+        `pm grant ${appId} ${permission} failed: ${r.stderr.trim() || r.stdout.trim()}. ` +
+          "Only runtime permissions the app declares in its manifest can be granted.",
+      );
+    }
+  }
+}
+
 export async function installApp(udid: string, appPath: string, bundleId: string): Promise<void> {
   await argent.run("reinstall-app", { udid, bundleId, appPath });
 }

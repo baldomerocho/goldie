@@ -130,6 +130,14 @@ renders the same result. The config also takes:
 ## Remarks
 
 - Use a Release build. Debug builds paint LogBox banners into the captures.
+- The app is reinstalled once per capture, so only the first flow starts
+  from a fresh install. If the app has onboarding that every flow must walk
+  through, set `resetBetweenScenes: true` in the config: the app's data is
+  cleared before every flow (`pm clear` on Android, a reinstall on iOS).
+- An Android app that asks for a runtime permission at launch pops the
+  system dialog over the first screen at an unpredictable moment. List those
+  permissions in `android.grantPermissions`; goldie grants them after every
+  install and reset.
 - Flows fail when the app changes. Ask the coding agent to repair them, or
   re-record them with argent.
 
